@@ -1,0 +1,7 @@
+Static package check
+PowerShell functions: 21
+Opening braces: 240
+Closing braces: 240
+Opening parentheses: 363
+Closing parentheses: 363
+Note: Runtime validation must be performed on Windows PowerShell 5.1
