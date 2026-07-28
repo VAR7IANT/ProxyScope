@@ -1,0 +1,12 @@
+# Generated reports
+ProxyScopeReports/
+*.html
+*.json
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Editors
+.vscode/
+.idea/
