@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Continue"
 $script:AppName = "ProxyScope"
-$script:Version = "4.0.0"
+$script:Version = "4.1.0"
 $script:LatestReport = $null
 
 $moduleRoot = Join-Path $PSScriptRoot "modules"
