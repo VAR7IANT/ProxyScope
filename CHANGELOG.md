@@ -1,5 +1,13 @@
 # ProxyScope Changelog
 
+## 4.1.1
+
+- Fixed language buttons not responding in some local HTML browser environments
+- Removed reliance on `NodeList.forEach` and forced `classList.toggle` behavior
+- Added direct button click fallback through `window.ProxyScopeSetLanguage`
+- Added compatibility for both `textContent` and `innerText`
+- Raised the language switcher stacking level to prevent invisible click blocking
+
 ## 4.1.0
 
 - Added an English and Simplified Chinese language selector to the HTML report
