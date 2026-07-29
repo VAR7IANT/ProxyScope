@@ -1,5 +1,15 @@
 # ProxyScope Changelog
 
+## 4.1.0
+
+- Added an English and Simplified Chinese language selector to the HTML report
+- Kept English as the default report language
+- Added a top-right language switcher
+- Added local language preference persistence through browser `localStorage`
+- Added Chinese translations for report sections, status cards, table headers, common values, severity badges, and automatic diagnosis findings
+- Kept technical addresses, ports, process names, and route values unchanged for accurate troubleshooting
+- Updated the README and report typography for bilingual display
+
 ## 4.0.0
 
 - Added a graphical Windows interface
