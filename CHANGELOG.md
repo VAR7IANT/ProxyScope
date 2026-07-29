@@ -1,5 +1,16 @@
 # ProxyScope Changelog
 
+## 4.2.0
+
+- Rebuilt the Windows desktop interface with a more polished visual hierarchy
+- Added live metric cards for overall status, critical findings, warnings, and passed checks
+- Added a dedicated scan overview panel with report path and quick actions
+- Added clearer progress, activity logging, completion feedback, and failure feedback
+- Added copy-path, open-report, and open-folder controls
+- Added keyboard shortcuts for Enter to run and Escape to close
+- Added a Windows PowerShell 5.1 validation workflow for every script update
+- Kept the bilingual HTML report and read-only diagnostic behavior
+
 ## 4.1.2
 
 - Fixed Windows PowerShell 5.1 parser failures caused by UTF-8 source files without a BOM
