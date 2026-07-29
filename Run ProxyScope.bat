@@ -33,6 +33,18 @@ if not "%errorlevel%"=="0" (
     exit /b 1
 )
 
+echo Validating PowerShell syntax...
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$failed=$false; Get-ChildItem -LiteralPath (Join-Path $env:PROXYSCOPE_ROOT 'src') -Filter '*.ps1' -Recurse -File | ForEach-Object { $tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile($_.FullName,[ref]$tokens,[ref]$errors) | Out-Null; if($errors.Count -gt 0){ $failed=$true; Write-Host ('ERROR in ' + $_.FullName) -ForegroundColor Red; $errors | ForEach-Object { Write-Host ('  Line ' + $_.Extent.StartLineNumber + ': ' + $_.Message) -ForegroundColor Red } } }; if($failed){ exit 2 }"
+
+if not "%errorlevel%"=="0" (
+    echo.
+    echo ERROR: PowerShell source validation failed
+    echo Download the latest clean copy of ProxyScope and try again
+    echo.
+    pause
+    exit /b 1
+)
+
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%"
 
 if not "%errorlevel%"=="0" (
