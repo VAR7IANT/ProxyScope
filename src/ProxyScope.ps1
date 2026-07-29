@@ -1,10 +1,10 @@
-param(
+﻿param(
     [switch]$Cli
 )
 
 $ErrorActionPreference = "Continue"
 $script:AppName = "ProxyScope"
-$script:Version = "4.1.2"
+$script:Version = "4.2.0"
 $script:LatestReport = $null
 
 $moduleRoot = Join-Path $PSScriptRoot "modules"
