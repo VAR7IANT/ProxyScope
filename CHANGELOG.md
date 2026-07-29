@@ -1,5 +1,13 @@
 # ProxyScope Changelog
 
+## 4.1.2
+
+- Fixed Windows PowerShell 5.1 parser failures caused by UTF-8 source files without a BOM
+- Added automatic UTF-8 BOM normalization for every PowerShell source file before startup
+- Added startup syntax validation using the built-in PowerShell parser
+- Added clear file and line diagnostics when source validation fails
+- Prevented cascading parser errors on Chinese Windows installations
+
 ## 4.1.1
 
 - Fixed language buttons not responding in some local HTML browser environments
