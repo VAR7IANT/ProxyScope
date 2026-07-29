@@ -1,21 +1,66 @@
+function Get-BilingualValue {
+    param(
+        [AllowNull()][object]$Value,
+        [hashtable]$Translations
+    )
+
+    $english = if ($null -eq $Value) { "" } else { [string]$Value }
+    $chinese = $english
+
+    if ($Translations -and $Translations.ContainsKey($english)) {
+        $chinese = [string]$Translations[$english]
+    }
+    elseif ($english -match "^Failed \((.+)\)$") {
+        $chinese = "失败 ($($Matches[1]))"
+    }
+    elseif ($english -match "^Failed: (.+)$") {
+        $chinese = "失败：$($Matches[1])"
+    }
+
+    return [PSCustomObject]@{
+        English = $english
+        Chinese = $chinese
+    }
+}
+
 function Convert-ObjectListToHtmlTable {
     param(
         [object[]]$Rows,
-        [string[]]$Columns
+        [string[]]$Columns,
+        [hashtable]$ColumnTranslations,
+        [hashtable]$ValueTranslations
     )
 
     if (-not $Rows -or $Rows.Count -eq 0) {
-        return '<div class="empty">No data found</div>'
+        return '<div class="empty" data-en="No data found" data-zh="未找到数据">No data found</div>'
     }
 
     $header = ($Columns | ForEach-Object {
-        "<th>$(ConvertTo-HtmlSafe $_)</th>"
+        $english = [string]$_
+        $chinese = if ($ColumnTranslations -and $ColumnTranslations.ContainsKey($english)) {
+            [string]$ColumnTranslations[$english]
+        }
+        else {
+            $english
+        }
+
+        $englishSafe = ConvertTo-HtmlSafe $english
+        $chineseSafe = ConvertTo-HtmlSafe $chinese
+        "<th data-en=`"$englishSafe`" data-zh=`"$chineseSafe`">$englishSafe</th>"
     }) -join ""
 
     $bodyRows = foreach ($row in $Rows) {
         $cells = foreach ($column in $Columns) {
-            $value = $row.$column
-            "<td>$(ConvertTo-HtmlSafe $value)</td>"
+            $translated = Get-BilingualValue -Value $row.$column -Translations $ValueTranslations
+            $englishSafe = ConvertTo-HtmlSafe $translated.English
+            $chineseSafe = ConvertTo-HtmlSafe $translated.Chinese
+
+            if ($translated.English -eq $translated.Chinese) {
+                "<td>$englishSafe</td>"
+            }
+            else {
+                "<td data-en=`"$englishSafe`" data-zh=`"$chineseSafe`">$englishSafe</td>"
+            }
         }
 
         "<tr>$($cells -join '')</tr>"
@@ -48,13 +93,25 @@ function New-Finding {
     param(
         [string]$Severity,
         [string]$Title,
-        [string]$Details
+        [string]$Details,
+        [string]$TitleZh = "",
+        [string]$DetailsZh = ""
     )
 
+    if ([string]::IsNullOrWhiteSpace($TitleZh)) {
+        $TitleZh = $Title
+    }
+
+    if ([string]::IsNullOrWhiteSpace($DetailsZh)) {
+        $DetailsZh = $Details
+    }
+
     return [PSCustomObject]@{
-        Severity = $Severity
-        Title    = $Title
-        Details  = $Details
+        Severity  = $Severity
+        Title     = $Title
+        Details   = $Details
+        TitleZh   = $TitleZh
+        DetailsZh = $DetailsZh
     }
 }
 
@@ -64,28 +121,107 @@ function Write-HtmlReport {
         [hashtable]$Data
     )
 
+    $severityTranslations = @{
+        "Critical" = "严重"
+        "Warning"  = "警告"
+        "OK"       = "正常"
+        "Info"     = "信息"
+    }
+
+    $columnTranslations = @{
+        "Setting"         = "设置"
+        "Value"           = "值"
+        "Port"            = "端口"
+        "Listening"       = "监听状态"
+        "Owner"           = "占用进程"
+        "HttpProxy"       = "HTTP 代理"
+        "Socks5Proxy"     = "SOCKS5 代理"
+        "Test"            = "测试"
+        "Success"         = "成功"
+        "ExitCode"        = "状态码"
+        "Interface"       = "网络接口"
+        "Description"     = "描述"
+        "Gateway"         = "网关"
+        "Status"          = "状态"
+        "LinkSpeed"       = "连接速度"
+        "MacAddress"      = "MAC 地址"
+        "Host"            = "主机"
+        "Address"         = "地址"
+        "Process"         = "进程"
+        "Scope"           = "范围"
+        "Name"            = "名称"
+        "Destination"     = "目标"
+        "NextHop"         = "下一跳"
+        "RouteMetric"     = "路由跃点"
+        "InterfaceMetric" = "接口跃点"
+        "Store"           = "存储"
+    }
+
+    $valueTranslations = @{
+        "Proxy enabled"                    = "代理启用状态"
+        "Proxy server"                     = "代理服务器"
+        "Automatic configuration URL"      = "自动配置 URL"
+        "Effective Baidu proxy"            = "百度实际使用代理"
+        "Effective Google proxy"           = "Google 实际使用代理"
+        "Direct Baidu"                     = "百度直连"
+        "Direct Microsoft"                 = "Microsoft 直连"
+        "Baidu through Windows proxy"      = "通过 Windows 代理访问百度"
+        "Google through Windows proxy"     = "通过 Windows 代理访问 Google"
+        "Enabled"                          = "已启用"
+        "Disabled"                         = "已禁用"
+        "Passed"                           = "通过"
+        "Failed"                           = "失败"
+        "True"                             = "是"
+        "False"                            = "否"
+        "Resolved"                         = "已解析"
+        "No address records"               = "没有地址记录"
+        "Not listening"                    = "未监听"
+        "(not set)"                        = "未设置"
+        "(unknown)"                        = "未知"
+        "(none)"                           = "无"
+        "Process"                          = "进程"
+        "User"                             = "用户"
+        "Machine"                          = "系统"
+    }
+
     $findingsHtml = foreach ($finding in $Data.Findings) {
         $className = Get-SeverityClass $finding.Severity
+        $severityZh = if ($severityTranslations.ContainsKey($finding.Severity)) {
+            $severityTranslations[$finding.Severity]
+        }
+        else {
+            $finding.Severity
+        }
+
+        $severityEnSafe = ConvertTo-HtmlSafe $finding.Severity
+        $severityZhSafe = ConvertTo-HtmlSafe $severityZh
+        $titleEnSafe = ConvertTo-HtmlSafe $finding.Title
+        $titleZhSafe = ConvertTo-HtmlSafe $finding.TitleZh
+        $detailsEnSafe = ConvertTo-HtmlSafe $finding.Details
+        $detailsZhSafe = ConvertTo-HtmlSafe $finding.DetailsZh
 
         @"
 <div class="finding $className">
-  <div class="finding-badge">$([System.Net.WebUtility]::HtmlEncode($finding.Severity))</div>
+  <div class="finding-badge" data-en="$severityEnSafe" data-zh="$severityZhSafe">$severityEnSafe</div>
   <div>
-    <div class="finding-title">$([System.Net.WebUtility]::HtmlEncode($finding.Title))</div>
-    <div class="finding-details">$([System.Net.WebUtility]::HtmlEncode($finding.Details))</div>
+    <div class="finding-title" data-en="$titleEnSafe" data-zh="$titleZhSafe">$titleEnSafe</div>
+    <div class="finding-details" data-en="$detailsEnSafe" data-zh="$detailsZhSafe">$detailsEnSafe</div>
   </div>
 </div>
 "@
     }
 
     $proxyStatusClass = if ($Data.Proxy.Enabled -eq 1) { "warning" } else { "ok" }
-    $proxyStatusText = if ($Data.Proxy.Enabled -eq 1) { "Enabled" } else { "Disabled" }
+    $proxyStatusTextEn = if ($Data.Proxy.Enabled -eq 1) { "Enabled" } else { "Disabled" }
+    $proxyStatusTextZh = if ($Data.Proxy.Enabled -eq 1) { "已启用" } else { "已禁用" }
 
     $directClass = if ($Data.DirectBaidu.Success) { "ok" } else { "critical" }
-    $directText = if ($Data.DirectBaidu.Success) { "Passed" } else { "Failed" }
+    $directTextEn = if ($Data.DirectBaidu.Success) { "Passed" } else { "Failed" }
+    $directTextZh = if ($Data.DirectBaidu.Success) { "通过" } else { "失败" }
 
     $systemClass = if ($Data.SystemProxyBaidu.Success) { "ok" } else { "critical" }
-    $systemText = if ($Data.SystemProxyBaidu.Success) { "Passed" } else { "Failed" }
+    $systemTextEn = if ($Data.SystemProxyBaidu.Success) { "Passed" } else { "Failed" }
+    $systemTextZh = if ($Data.SystemProxyBaidu.Success) { "通过" } else { "失败" }
 
     $criticalCount = @($Data.Findings | Where-Object { $_.Severity -eq "Critical" }).Count
     $warningCount = @($Data.Findings | Where-Object { $_.Severity -eq "Warning" }).Count
@@ -100,7 +236,7 @@ function Write-HtmlReport {
         "ok"
     }
 
-    $overallText = if ($criticalCount -gt 0) {
+    $overallTextEn = if ($criticalCount -gt 0) {
         "Action required"
     }
     elseif ($warningCount -gt 0) {
@@ -108,6 +244,16 @@ function Write-HtmlReport {
     }
     else {
         "Healthy"
+    }
+
+    $overallTextZh = if ($criticalCount -gt 0) {
+        "需要处理"
+    }
+    elseif ($warningCount -gt 0) {
+        "建议检查"
+    }
+    else {
+        "状态正常"
     }
 
     $proxyRows = @(
@@ -154,7 +300,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: "Segoe UI", Inter, Arial, sans-serif;
+  font-family: "Segoe UI", "Microsoft YaHei UI", Inter, Arial, sans-serif;
 }
 .container {
   max-width: 1180px;
@@ -162,17 +308,51 @@ body {
   padding: 34px 22px 64px;
 }
 .hero {
+  position: relative;
   background: linear-gradient(135deg, #111827, #374151);
   color: white;
   border-radius: 22px;
   padding: 30px;
   box-shadow: var(--shadow);
 }
+.language-switcher {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 10px;
+  background: rgba(17,24,39,.42);
+  backdrop-filter: blur(12px);
+}
+.language-button {
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 11px;
+  background: transparent;
+  color: #d1d5db;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.language-button:hover {
+  color: white;
+  background: rgba(255,255,255,.08);
+}
+.language-button.active {
+  color: #111827;
+  background: white;
+}
 .hero-top {
   display: flex;
   justify-content: space-between;
   gap: 24px;
   align-items: flex-start;
+  padding-top: 36px;
 }
 .eyebrow {
   font-size: 12px;
@@ -189,6 +369,7 @@ h1 {
 .subtitle {
   color: #d1d5db;
   max-width: 720px;
+  line-height: 1.6;
 }
 .overall {
   min-width: 170px;
@@ -226,6 +407,10 @@ h1 {
   text-transform: uppercase;
   letter-spacing: .08em;
   font-weight: 700;
+}
+html[lang="zh-CN"] .card-label {
+  text-transform: none;
+  letter-spacing: .02em;
 }
 .card-value {
   margin-top: 8px;
@@ -270,12 +455,16 @@ h1 {
   text-transform: uppercase;
   letter-spacing: .06em;
 }
+html[lang="zh-CN"] .finding-badge {
+  text-transform: none;
+  letter-spacing: .02em;
+}
 .finding.ok .finding-badge { color: var(--ok); }
 .finding.warning .finding-badge { color: var(--warn); }
 .finding.critical .finding-badge { color: var(--critical); }
 .finding.info .finding-badge { color: var(--info); }
 .finding-title { font-weight: 750; margin-bottom: 4px; }
-.finding-details { color: #4b5563; line-height: 1.5; }
+.finding-details { color: #4b5563; line-height: 1.55; }
 .table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -300,24 +489,15 @@ th {
   text-transform: uppercase;
   letter-spacing: .04em;
 }
+html[lang="zh-CN"] th {
+  text-transform: none;
+  letter-spacing: .01em;
+}
 td {
   font-size: 13px;
   color: #374151;
 }
 tr:last-child td { border-bottom: 0; }
-details {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  margin-top: 12px;
-  overflow: hidden;
-}
-summary {
-  cursor: pointer;
-  padding: 14px 16px;
-  font-weight: 700;
-  background: #f9fafb;
-}
-.details-body { padding: 14px; }
 .empty {
   color: var(--muted);
   padding: 18px;
@@ -339,104 +519,164 @@ summary {
   .cards { grid-template-columns: 1fr; }
   h1 { font-size: 26px; }
   .container { padding: 18px 12px 40px; }
+  .hero { padding: 22px; }
+  .hero-top { padding-top: 48px; }
   .finding { grid-template-columns: 1fr; }
+  .language-switcher { top: 14px; right: 14px; }
 }
 </style>
 </head>
 <body>
 <div class="container">
   <section class="hero">
+    <div class="language-switcher" role="group" aria-label="Report language">
+      <button type="button" class="language-button active" data-language="en">English</button>
+      <button type="button" class="language-button" data-language="zh">中文</button>
+    </div>
+
     <div class="hero-top">
       <div>
-        <div class="eyebrow">Windows diagnostics</div>
+        <div class="eyebrow" data-en="Windows diagnostics" data-zh="Windows 网络诊断">Windows diagnostics</div>
         <h1>ProxyScope</h1>
-        <div class="subtitle">A read-only diagnostic report for Windows proxy, DNS, routing, local proxy ports, and direct connectivity.</div>
+        <div class="subtitle" data-en="A read-only diagnostic report for Windows proxy, DNS, routing, local proxy ports, and direct connectivity." data-zh="只读检测 Windows 系统代理、DNS、路由、本地代理端口和网络直连状态。">A read-only diagnostic report for Windows proxy, DNS, routing, local proxy ports, and direct connectivity.</div>
       </div>
-      <div class="overall">$overallText</div>
+      <div class="overall" data-en="$overallTextEn" data-zh="$overallTextZh">$overallTextEn</div>
     </div>
+
     <div class="meta">
-      <span>Version $($script:Version)</span>
-      <span>Generated $($Data.Generated)</span>
+      <span><span data-en="Version" data-zh="版本">Version</span> $($script:Version)</span>
+      <span><span data-en="Generated" data-zh="生成时间">Generated</span> $($Data.Generated)</span>
       <span>$([System.Net.WebUtility]::HtmlEncode($Data.Computer))</span>
-      <span>Administrator $($Data.Administrator)</span>
+      <span><span data-en="Administrator" data-zh="管理员权限">Administrator</span> $($Data.Administrator)</span>
     </div>
   </section>
 
   <section class="cards">
     <div class="card $overallClass">
-      <div class="card-label">Overall status</div>
-      <div class="card-value">$overallText</div>
+      <div class="card-label" data-en="Overall status" data-zh="总体状态">Overall status</div>
+      <div class="card-value" data-en="$overallTextEn" data-zh="$overallTextZh">$overallTextEn</div>
     </div>
     <div class="card $proxyStatusClass">
-      <div class="card-label">Windows proxy</div>
-      <div class="card-value">$proxyStatusText</div>
+      <div class="card-label" data-en="Windows proxy" data-zh="Windows 代理">Windows proxy</div>
+      <div class="card-value" data-en="$proxyStatusTextEn" data-zh="$proxyStatusTextZh">$proxyStatusTextEn</div>
     </div>
     <div class="card $directClass">
-      <div class="card-label">Direct access</div>
-      <div class="card-value">$directText</div>
+      <div class="card-label" data-en="Direct access" data-zh="网络直连">Direct access</div>
+      <div class="card-value" data-en="$directTextEn" data-zh="$directTextZh">$directTextEn</div>
     </div>
     <div class="card $systemClass">
-      <div class="card-label">System proxy access</div>
-      <div class="card-value">$systemText</div>
+      <div class="card-label" data-en="System proxy access" data-zh="系统代理访问">System proxy access</div>
+      <div class="card-value" data-en="$systemTextEn" data-zh="$systemTextZh">$systemTextEn</div>
     </div>
   </section>
 
   <section class="section">
-    <h2>Automatic diagnosis</h2>
+    <h2 data-en="Automatic diagnosis" data-zh="自动诊断">Automatic diagnosis</h2>
     <div class="findings">
       $($findingsHtml -join "`n")
     </div>
   </section>
 
   <section class="section">
-    <h2>Windows proxy settings</h2>
-    $(Convert-ObjectListToHtmlTable -Rows $proxyRows -Columns @("Setting", "Value"))
+    <h2 data-en="Windows proxy settings" data-zh="Windows 代理设置">Windows proxy settings</h2>
+    $(Convert-ObjectListToHtmlTable -Rows $proxyRows -Columns @("Setting", "Value") -ColumnTranslations $columnTranslations -ValueTranslations $valueTranslations)
   </section>
 
   <section class="section">
-    <h2>Local proxy ports</h2>
-    $(Convert-ObjectListToHtmlTable -Rows $Data.PortRows -Columns @("Port", "Listening", "Owner", "HttpProxy", "Socks5Proxy"))
+    <h2 data-en="Local proxy ports" data-zh="本地代理端口">Local proxy ports</h2>
+    $(Convert-ObjectListToHtmlTable -Rows $Data.PortRows -Columns @("Port", "Listening", "Owner", "HttpProxy", "Socks5Proxy") -ColumnTranslations $columnTranslations -ValueTranslations $valueTranslations)
   </section>
 
   <section class="section">
-    <h2>Connectivity</h2>
-    $(Convert-ObjectListToHtmlTable -Rows $connectivityRows -Columns @("Test", "Success", "ExitCode"))
+    <h2 data-en="Connectivity" data-zh="网络连通性">Connectivity</h2>
+    $(Convert-ObjectListToHtmlTable -Rows $connectivityRows -Columns @("Test", "Success", "ExitCode") -ColumnTranslations $columnTranslations -ValueTranslations $valueTranslations)
   </section>
 
   <section class="section">
-    <h2>Network adapters</h2>
-    $(Convert-ObjectListToHtmlTable -Rows $Data.NetworkAdapters -Columns @("Interface", "Description", "IPv4", "IPv6", "Gateway", "DNS"))
+    <h2 data-en="Network adapters" data-zh="网络适配器">Network adapters</h2>
+    $(Convert-ObjectListToHtmlTable -Rows $Data.NetworkAdapters -Columns @("Interface", "Description", "IPv4", "IPv6", "Gateway", "DNS") -ColumnTranslations $columnTranslations -ValueTranslations $valueTranslations)
   </section>
 
   <section class="section">
-    <h2>Wi-Fi</h2>
-    $(Convert-ObjectListToHtmlTable -Rows $Data.WiFi -Columns @("Interface", "Description", "Status", "LinkSpeed", "MacAddress"))
+    <h2 data-en="Wi-Fi" data-zh="Wi-Fi">Wi-Fi</h2>
+    $(Convert-ObjectListToHtmlTable -Rows $Data.WiFi -Columns @("Interface", "Description", "Status", "LinkSpeed", "MacAddress") -ColumnTranslations $columnTranslations -ValueTranslations $valueTranslations)
   </section>
 
   <section class="section">
-    <h2>DNS resolution</h2>
-    $(Convert-ObjectListToHtmlTable -Rows $Data.DnsRows -Columns @("Host", "Address", "Status"))
+    <h2 data-en="DNS resolution" data-zh="DNS 解析">DNS resolution</h2>
+    $(Convert-ObjectListToHtmlTable -Rows $Data.DnsRows -Columns @("Host", "Address", "Status") -ColumnTranslations $columnTranslations -ValueTranslations $valueTranslations)
   </section>
 
   <section class="section">
-    <h2>Proxy and VPN processes</h2>
-    $(Convert-ObjectListToHtmlTable -Rows $Data.ProcessRows -Columns @("Process", "PID"))
+    <h2 data-en="Proxy and VPN processes" data-zh="代理与 VPN 进程">Proxy and VPN processes</h2>
+    $(Convert-ObjectListToHtmlTable -Rows $Data.ProcessRows -Columns @("Process", "PID") -ColumnTranslations $columnTranslations -ValueTranslations $valueTranslations)
   </section>
 
   <section class="section">
-    <h2>Proxy environment variables</h2>
-    $(Convert-ObjectListToHtmlTable -Rows $Data.EnvironmentRows -Columns @("Scope", "Name", "Value"))
+    <h2 data-en="Proxy environment variables" data-zh="代理环境变量">Proxy environment variables</h2>
+    $(Convert-ObjectListToHtmlTable -Rows $Data.EnvironmentRows -Columns @("Scope", "Name", "Value") -ColumnTranslations $columnTranslations -ValueTranslations $valueTranslations)
   </section>
 
   <section class="section">
-    <h2>IPv4 routes</h2>
-    $(Convert-ObjectListToHtmlTable -Rows $Data.RouteRows -Columns @("Destination", "NextHop", "Interface", "RouteMetric", "InterfaceMetric", "Store"))
+    <h2 data-en="IPv4 routes" data-zh="IPv4 路由">IPv4 routes</h2>
+    $(Convert-ObjectListToHtmlTable -Rows $Data.RouteRows -Columns @("Destination", "NextHop", "Interface", "RouteMetric", "InterfaceMetric", "Store") -ColumnTranslations $columnTranslations -ValueTranslations $valueTranslations)
   </section>
 
-  <div class="footer">
+  <div class="footer" data-en="Generated by ProxyScope $($script:Version). This tool does not modify network settings." data-zh="由 ProxyScope $($script:Version) 生成。本工具不会修改任何网络设置。">
     Generated by ProxyScope $($script:Version). This tool does not modify network settings.
   </div>
 </div>
+
+<script>
+(function () {
+  var storageKey = "proxyscope-report-language";
+  var buttons = document.querySelectorAll("[data-language]");
+
+  function applyLanguage(language) {
+    var selected = language === "zh" ? "zh" : "en";
+    var attribute = selected === "zh" ? "data-zh" : "data-en";
+
+    document.documentElement.lang = selected === "zh" ? "zh-CN" : "en";
+    document.title = selected === "zh" ? "ProxyScope 诊断报告" : "ProxyScope Report";
+
+    document.querySelectorAll("[data-en][data-zh]").forEach(function (element) {
+      element.textContent = element.getAttribute(attribute);
+    });
+
+    buttons.forEach(function (button) {
+      var active = button.getAttribute("data-language") === selected;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+
+    try {
+      window.localStorage.setItem(storageKey, selected);
+    }
+    catch (error) {
+    }
+  }
+
+  buttons.forEach(function (button) {
+    button.addEventListener("click", function () {
+      applyLanguage(button.getAttribute("data-language"));
+    });
+  });
+
+  var initialLanguage = "en";
+
+  try {
+    var savedLanguage = window.localStorage.getItem(storageKey);
+
+    if (savedLanguage === "en" || savedLanguage === "zh") {
+      initialLanguage = savedLanguage;
+    }
+  }
+  catch (error) {
+  }
+
+  applyLanguage(initialLanguage);
+})();
+</script>
 </body>
 </html>
 "@
