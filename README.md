@@ -4,11 +4,13 @@ A lightweight, read-only Windows diagnostic utility for proxy settings, DNS, loc
 
 ## Highlights
 
-- Clean graphical interface
+- Premium desktop interface with live scan status and summary cards
+- Clear counts for critical findings, warnings, and passed checks
+- Dedicated activity log, report-path panel, and quick actions
 - English-first application and repository files
 - Bilingual HTML report with **English** and **中文**
 - English is the default report language
-- Top-right language switch remembers the user's local choice
+- Top-right report language switch remembers the user's local choice
 - Responsive HTML report with status cards
 - Automatic diagnosis with bilingual severity labels and explanations
 - Local HTTP and SOCKS5 proxy tests
@@ -16,6 +18,7 @@ A lightweight, read-only Windows diagnostic utility for proxy settings, DNS, loc
 - DNS and direct connectivity checks
 - Network adapter, Wi-Fi, process, environment, and route inspection
 - JSON report for issue templates and automated analysis
+- Windows PowerShell 5.1 syntax validation in GitHub Actions
 - No changes to proxy, DNS, route, adapter, firewall, or registry settings
 
 ## Requirements
@@ -31,7 +34,7 @@ A lightweight, read-only Windows diagnostic utility for proxy settings, DNS, loc
 2. Double-click `Run ProxyScope.bat`
 3. Accept the administrator prompt
 4. Select **Run diagnosis**
-5. Review the generated HTML report
+5. Review the live status cards and generated HTML report
 6. Use the **English / 中文** selector in the top-right corner of the report
 
 Reports are saved to:
@@ -106,8 +109,12 @@ ProxyScope
 │       ├── Common.ps1
 │       ├── Network.ps1
 │       ├── Report.ps1
+│       ├── ReportCompatibility.ps1
 │       ├── Diagnosis.ps1
 │       └── UI.ps1
+├── .github
+│   └── workflows
+│       └── powershell-validation.yml
 ├── docs
 │   └── SECURITY_AND_PRIVACY.md
 ├── CHANGELOG.md
