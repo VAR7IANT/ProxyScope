@@ -5,9 +5,12 @@ A lightweight, read-only Windows diagnostic utility for proxy settings, DNS, loc
 ## Highlights
 
 - Clean graphical interface
-- English-only application text
+- English-first application and repository files
+- Bilingual HTML report with **English** and **中文**
+- English is the default report language
+- Top-right language switch remembers the user's local choice
 - Responsive HTML report with status cards
-- Automatic diagnosis with severity labels
+- Automatic diagnosis with bilingual severity labels and explanations
 - Local HTTP and SOCKS5 proxy tests
 - Windows system proxy request tests
 - DNS and direct connectivity checks
@@ -29,6 +32,7 @@ A lightweight, read-only Windows diagnostic utility for proxy settings, DNS, loc
 3. Accept the administrator prompt
 4. Select **Run diagnosis**
 5. Review the generated HTML report
+6. Use the **English / 中文** selector in the top-right corner of the report
 
 Reports are saved to:
 
@@ -42,6 +46,10 @@ Each scan creates:
 proxy_network_report_YYYYMMDD_HHMMSS.html
 proxy_network_report_YYYYMMDD_HHMMSS.json
 ```
+
+The HTML report stores the selected display language locally in the browser
+
+No language preference is uploaded or written to the Windows registry
 
 ## Command-line mode
 
@@ -93,7 +101,13 @@ Review a report before posting it publicly
 ProxyScope
 ├── Run ProxyScope.bat
 ├── src
-│   └── ProxyScope.ps1
+│   ├── ProxyScope.ps1
+│   └── modules
+│       ├── Common.ps1
+│       ├── Network.ps1
+│       ├── Report.ps1
+│       ├── Diagnosis.ps1
+│       └── UI.ps1
 ├── docs
 │   └── SECURITY_AND_PRIVACY.md
 ├── CHANGELOG.md
